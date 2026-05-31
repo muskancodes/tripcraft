@@ -59,7 +59,7 @@ export default function TimelineTab({ trip }: Props) {
     ...trip.timelineEvents,
   ]
     .filter(e => e.date)
-    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+    .sort((a, b) => (a.date + ((a as TimelineEvent).time || '')).localeCompare(b.date + ((b as TimelineEvent).time || '')));
 
   const grouped = autoEvents.reduce((acc, e) => {
     if (!acc[e.date]) acc[e.date] = [];
