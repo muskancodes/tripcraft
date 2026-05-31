@@ -17,8 +17,17 @@ const QUICK_PROMPTS = [
 const GREETING: AIMessage = {
   id: 'greeting',
   role: 'assistant',
-  content: "Hello! I'm your AI travel assistant powered by Claude. I can help you plan activities, suggest hotels, create itineraries, advise on budgets in ₹, and answer any travel question. What would you like to explore?",
+  content: "Hello! I'm your AI travel assistant. I can help you plan activities, suggest hotels, create itineraries, advise on budgets in ₹, and answer any travel question. What would you like to explore?",
   timestamp: new Date().toISOString(),
+};
+
+type Provider = 'claude' | 'gemini' | 'none' | 'loading';
+
+const PROVIDER_LABEL: Record<Provider, string> = {
+  claude:  'Powered by Claude',
+  gemini:  'Powered by Gemini (free)',
+  none:    'No AI key configured',
+  loading: 'Loading…',
 };
 
 export default function AIAssistant() {
@@ -27,8 +36,16 @@ export default function AIAssistant() {
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [provider, setProvider] = useState<Provider>('loading');
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    fetch('/api/ai/provider')
+      .then(r => r.json())
+      .then(d => setProvider(d.provider as Provider))
+      .catch(() => setProvider('none'));
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -124,8 +141,8 @@ export default function AIAssistant() {
     } catch (err: unknown) {
       if ((err as Error).name === 'AbortError') return;
       const msg = (err as Error).message ?? 'Unknown error';
-      setApiError(msg.includes('API key') || msg.includes('not set')
-        ? 'Add your Claude API key to .env → ANTHROPIC_API_KEY=sk-ant-...'
+      setApiError(msg.includes('No AI key')
+        ? 'No AI key configured. Add GEMINI_API_KEY (free) or ANTHROPIC_API_KEY to your .env file.'
         : msg);
       setMessages(prev => prev.filter(m => m.id !== assistantId));
     } finally {
@@ -155,7 +172,9 @@ export default function AIAssistant() {
         </div>
         <div className="flex-1">
           <p className="text-sm font-semibold text-white">AI Travel Assistant</p>
-          <p className="text-xs text-gray-500">Powered by Claude</p>
+          <p className={`text-xs ${provider === 'none' ? 'text-red-400' : 'text-gray-500'}`}>
+            {PROVIDER_LABEL[provider]}
+          </p>
         </div>
         <button onClick={() => setAIPanelOpen(false)}
           className="p-1.5 rounded-xl hover:bg-white/10 text-gray-400 transition-colors">
