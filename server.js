@@ -28,10 +28,11 @@ if (IS_HOSTED && APP_PASSWORD) {
   });
 }
 
-// ── Serve built frontend (hosted mode) ────────────────────────────
+// ── Serve built frontend (always if dist/ exists) ─────────────────
 const DIST = path.join(__dirname, 'dist');
-if (IS_HOSTED && fs.existsSync(DIST)) {
+if (fs.existsSync(DIST)) {
   app.use(express.static(DIST));
+  console.log(`   Serving frontend from: ${DIST}`);
 }
 
 // ── State persistence ──────────────────────────────────────────────
@@ -166,8 +167,8 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-// ── SPA fallback (hosted mode) ─────────────────────────────────────
-if (IS_HOSTED && fs.existsSync(DIST)) {
+// ── SPA fallback (always if dist/ exists) ─────────────────────────
+if (fs.existsSync(DIST)) {
   app.get('*', (_req, res) => res.sendFile(path.join(DIST, 'index.html')));
 }
 
