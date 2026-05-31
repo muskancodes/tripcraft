@@ -28,11 +28,26 @@ if (IS_HOSTED && APP_PASSWORD) {
   });
 }
 
-// ── Serve built frontend (always if dist/ exists) ─────────────────
+// ── Serve built frontend ──────────────────────────────────────────
 const DIST = path.join(__dirname, 'dist');
+console.log(`   __dirname: ${__dirname}`);
+console.log(`   DIST path: ${DIST}`);
+console.log(`   DIST exists: ${fs.existsSync(DIST)}`);
+try {
+  console.log(`   /app contents: ${fs.readdirSync('/app').join(', ')}`);
+} catch (e) { /* ignore */ }
+
 if (fs.existsSync(DIST)) {
   app.use(express.static(DIST));
-  console.log(`   Serving frontend from: ${DIST}`);
+  console.log(`   ✅ Serving frontend from: ${DIST}`);
+} else {
+  console.log(`   ⚠️  dist/ not found — frontend will not be served`);
+  // Fallback: try serving from current working directory
+  const CWD_DIST = path.join(process.cwd(), 'dist');
+  if (fs.existsSync(CWD_DIST)) {
+    app.use(express.static(CWD_DIST));
+    console.log(`   ✅ Serving frontend from cwd: ${CWD_DIST}`);
+  }
 }
 
 // ── State persistence ──────────────────────────────────────────────
@@ -167,9 +182,15 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-// ── SPA fallback (always if dist/ exists) ─────────────────────────
-if (fs.existsSync(DIST)) {
-  app.get('*', (_req, res) => res.sendFile(path.join(DIST, 'index.html')));
+// ── SPA fallback ──────────────────────────────────────────────────
+const DIST_INDEX = fs.existsSync(path.join(DIST, 'index.html'))
+  ? path.join(DIST, 'index.html')
+  : fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'))
+    ? path.join(process.cwd(), 'dist', 'index.html')
+    : null;
+
+if (DIST_INDEX) {
+  app.get('*', (_req, res) => res.sendFile(DIST_INDEX));
 }
 
 // ── Start ──────────────────────────────────────────────────────────
