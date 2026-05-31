@@ -286,7 +286,7 @@ export default function PlacesTab({ trip }: Props) {
               </div>
               <FF label="Website" value={form.website ?? ''} onChange={v => setForm(p => ({ ...p, website: v }))}
                 placeholder="https://…" className="col-span-2 md:col-span-1" />
-              <FF label="Description" value={form.description} onChange={v => setForm(p => ({ ...p, description: v }))}
+              <FF label="Description" value={form.description ?? ''} onChange={v => setForm(p => ({ ...p, description: v }))}
                 placeholder="Brief description…" className="col-span-2 md:col-span-2" />
             </div>
             <div>
@@ -436,7 +436,7 @@ function PlaceCard({ place, tripId, currency, index }: {
                 onChange={e => setEditForm(p => ({ ...p, rating: parseFloat(e.target.value) || 0 }))} />
             </div>
           </div>
-          <FF label="Description" value={editForm.description} onChange={v => setEditForm(p => ({ ...p, description: v }))} placeholder="Brief description…" />
+          <FF label="Description" value={editForm.description ?? ''} onChange={v => setEditForm(p => ({ ...p, description: v }))} placeholder="Brief description…" />
           <div>
             <label className="label">Notes</label>
             <textarea className="input-field resize-none" rows={2} value={editForm.notes ?? ''}
