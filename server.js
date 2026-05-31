@@ -191,6 +191,21 @@ const DIST_INDEX = fs.existsSync(path.join(DIST, 'index.html'))
 
 if (DIST_INDEX) {
   app.get('*', (_req, res) => res.sendFile(DIST_INDEX));
+} else {
+  // Fallback: show debug info so we can diagnose
+  app.get('*', (_req, res) => {
+    const cwd = process.cwd();
+    const appFiles = (() => { try { return fs.readdirSync('/app').join(', '); } catch { return 'n/a'; } })();
+    const cwdFiles = (() => { try { return fs.readdirSync(cwd).join(', '); } catch { return 'n/a'; } })();
+    res.status(200).send(`
+      <h2>TripCraft is running but frontend not found</h2>
+      <p><b>__dirname:</b> ${__dirname}</p>
+      <p><b>cwd:</b> ${cwd}</p>
+      <p><b>DIST:</b> ${DIST}</p>
+      <p><b>/app contents:</b> ${appFiles}</p>
+      <p><b>cwd contents:</b> ${cwdFiles}</p>
+    `);
+  });
 }
 
 // ── Start ──────────────────────────────────────────────────────────
