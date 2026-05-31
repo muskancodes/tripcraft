@@ -1,7 +1,8 @@
 [build]
-builder = "dockerfile"
+builder = "nixpacks"
+buildCommand = "npm install"
 
 [deploy]
-startCommand = "node server.js"
+startCommand = "npm run build && node server.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
