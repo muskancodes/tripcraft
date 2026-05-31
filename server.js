@@ -8,10 +8,31 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+const IS_HOSTED = process.env.HOSTED === 'true';   // set in Railway env vars
+const APP_PASSWORD = process.env.APP_PASSWORD || '';  // set in Railway env vars
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// ── Simple password protection (hosted mode only) ──────────────────
+// All /api routes require ?token=PASSWORD or Authorization: Bearer PASSWORD
+// The frontend sends the token stored in localStorage.
+if (IS_HOSTED && APP_PASSWORD) {
+  app.use('/api', (req, res, next) => {
+    const token =
+      req.query.token ||
+      (req.headers.authorization || '').replace('Bearer ', '');
+    if (token === APP_PASSWORD) return next();
+    res.status(401).json({ error: 'Unauthorized' });
+  });
+}
+
+// ── Serve built frontend (hosted mode) ────────────────────────────
+const DIST = path.join(__dirname, 'dist');
+if (IS_HOSTED && fs.existsSync(DIST)) {
+  app.use(express.static(DIST));
+}
 
 // ── State persistence ──────────────────────────────────────────────
 const DATA_DIR = path.join(__dirname, 'data');
@@ -30,9 +51,7 @@ const writeState = (data) => {
 };
 
 // GET full state
-app.get('/api/state', (_req, res) => {
-  res.json(readState());
-});
+app.get('/api/state', (_req, res) => res.json(readState()));
 
 // PUT full state
 app.put('/api/state', (req, res) => {
@@ -56,12 +75,10 @@ Keep responses focused. When quoting prices, use INR (₹) where possible.`;
 app.post('/api/ai/chat', async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey === 'your_claude_api_key_here') {
-    return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set in .env file' });
+    return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set' });
   }
 
   const { messages } = req.body;
-
-  // Set SSE headers for streaming
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -80,7 +97,6 @@ app.post('/api/ai/chat', async (req, res) => {
         res.write(`data: ${JSON.stringify({ delta: event.delta.text })}\n\n`);
       }
     }
-
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
@@ -89,14 +105,18 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
+// ── SPA fallback (hosted mode) ─────────────────────────────────────
+if (IS_HOSTED && fs.existsSync(DIST)) {
+  app.get('*', (_req, res) => res.sendFile(path.join(DIST, 'index.html')));
+}
+
 // ── Start ──────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n✅ TripCraft backend running on http://0.0.0.0:${PORT}`);
-  console.log(`   State stored at: ${STATE_FILE}`);
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || key === 'your_claude_api_key_here') {
-    console.log(`\n⚠️  Add your Claude API key to .env:\n   ANTHROPIC_API_KEY=sk-ant-...`);
-  } else {
-    console.log(`   Claude AI: ✅ API key loaded`);
+  console.log(`\n✅ TripCraft running on http://0.0.0.0:${PORT}`);
+  if (IS_HOSTED) {
+    console.log(`   Mode: HOSTED (serving built frontend)`);
+    console.log(`   Password protection: ${APP_PASSWORD ? '✅ enabled' : '⚠️  disabled (set APP_PASSWORD)'}`);
   }
+  const key = process.env.ANTHROPIC_API_KEY;
+  console.log(`   Claude AI: ${key && key !== 'your_claude_api_key_here' ? '✅ enabled' : '⚠️  disabled (no API key)'}`);
 });
