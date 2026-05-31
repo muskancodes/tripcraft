@@ -4,6 +4,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import Anthropic from '@anthropic-ai/sdk';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,27 +29,23 @@ if (IS_HOSTED && APP_PASSWORD) {
   });
 }
 
-// ── Serve built frontend ──────────────────────────────────────────
+// ── Build + serve frontend ────────────────────────────────────────
 const DIST = path.join(__dirname, 'dist');
-console.log(`   __dirname: ${__dirname}`);
-console.log(`   DIST path: ${DIST}`);
-console.log(`   DIST exists: ${fs.existsSync(DIST)}`);
-try {
-  console.log(`   /app contents: ${fs.readdirSync('/app').join(', ')}`);
-} catch (e) { /* ignore */ }
 
-if (fs.existsSync(DIST)) {
-  app.use(express.static(DIST));
-  console.log(`   ✅ Serving frontend from: ${DIST}`);
-} else {
-  console.log(`   ⚠️  dist/ not found — frontend will not be served`);
-  // Fallback: try serving from current working directory
-  const CWD_DIST = path.join(process.cwd(), 'dist');
-  if (fs.existsSync(CWD_DIST)) {
-    app.use(express.static(CWD_DIST));
-    console.log(`   ✅ Serving frontend from cwd: ${CWD_DIST}`);
+// Auto-build if dist/ is missing (handles Railway cache misses)
+if (!fs.existsSync(path.join(DIST, 'index.html'))) {
+  console.log('   dist/ not found — building frontend now...');
+  try {
+    execSync('npm run build', { stdio: 'inherit', cwd: __dirname });
+    console.log('   ✅ Frontend built successfully');
+  } catch (e) {
+    console.error('   ❌ Build failed:', e.message);
   }
 }
+
+// Serve static files
+app.use(express.static(DIST));
+console.log(`   Serving frontend from: ${DIST}`);
 
 // ── State persistence ──────────────────────────────────────────────
 const DATA_DIR = path.join(__dirname, 'data');
@@ -183,30 +180,14 @@ app.post('/api/ai/chat', async (req, res) => {
 });
 
 // ── SPA fallback ──────────────────────────────────────────────────
-const DIST_INDEX = fs.existsSync(path.join(DIST, 'index.html'))
-  ? path.join(DIST, 'index.html')
-  : fs.existsSync(path.join(process.cwd(), 'dist', 'index.html'))
-    ? path.join(process.cwd(), 'dist', 'index.html')
-    : null;
-
-if (DIST_INDEX) {
-  app.get('*', (_req, res) => res.sendFile(DIST_INDEX));
-} else {
-  // Fallback: show debug info so we can diagnose
-  app.get('*', (_req, res) => {
-    const cwd = process.cwd();
-    const appFiles = (() => { try { return fs.readdirSync('/app').join(', '); } catch { return 'n/a'; } })();
-    const cwdFiles = (() => { try { return fs.readdirSync(cwd).join(', '); } catch { return 'n/a'; } })();
-    res.status(200).send(`
-      <h2>TripCraft is running but frontend not found</h2>
-      <p><b>__dirname:</b> ${__dirname}</p>
-      <p><b>cwd:</b> ${cwd}</p>
-      <p><b>DIST:</b> ${DIST}</p>
-      <p><b>/app contents:</b> ${appFiles}</p>
-      <p><b>cwd contents:</b> ${cwdFiles}</p>
-    `);
-  });
-}
+app.get('*', (_req, res) => {
+  const index = path.join(DIST, 'index.html');
+  if (fs.existsSync(index)) {
+    res.sendFile(index);
+  } else {
+    res.status(200).send('<h2>TripCraft: frontend build failed. Check server logs.</h2>');
+  }
+});
 
 // ── Start ──────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
